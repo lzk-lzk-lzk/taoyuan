@@ -1,0 +1,74 @@
+# 服务端口配置
+server:
+  port: 8080
+
+# Spring 基础配置
+spring:
+  application:
+    name: peach
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/taoyuan?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: 123456
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 20MB
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+# Swagger 文档配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+# MyBatis Plus 配置
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+  type-aliases-package: com.example.peach.modules.user.entity,com.example.peach.modules.variety.entity
+  global-config:
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+      id-type: assign_id
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# JWT 配置
+jwt:
+  secret: peach-resource-management-system-secret-key-2026
+  expire-seconds: 86400
+  header: Authorization
+  token-prefix: Bearer 
+
+# 项目自定义配置
+peach:
+  file:
+    base-path: D:/project/taoyuan/data
+    upload-access-path: /static/**
+    upload-url-prefix: /static
+    image-max-size: 5242880
+    allowed-image-types:
+      - jpg
+      - jpeg
+      - png
+      - webp
+  qrcode:
+    default-target-prefix: https://example.com/miniapp/variety/detail?id=
+
+# 微信小程序配置
+wechat:
+  miniapp:
+    app-id: your-miniapp-appid
+    app-secret: your-miniapp-secret
+    access-token-url: https://api.weixin.qq.com/cgi-bin/token
+    code2-session-url: https://api.weixin.qq.com/sns/jscode2session
+    phone-number-url: https://api.weixin.qq.com/wxa/business/getuserphonenumber
