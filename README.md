@@ -21,6 +21,7 @@
 
 - `common`：通用配置、异常、返回体、安全组件
 - `modules/auth`：登录认证、当前用户、修改密码
+- `modules/category`：种属分类管理
 - `modules/user`：账号管理
 - `modules/variety`：品种管理
 - `modules/file`：本地图片上传
@@ -34,10 +35,11 @@
 ## 接口说明
 
 - 认证：`/api/auth/login`、`/api/auth/miniapp/login`、`/api/auth/logout`、`/api/auth/info`、`/api/auth/password`
+- 种属：`/api/categories/tree`、`/api/categories`
 - 用户：`/api/users/page`、`/api/users/{id}`、`/api/users`、`/api/users/resetPassword`、`/api/users/status`
-- 品种：`/api/varieties/page`、`/api/varieties/{id}`、`/api/varieties`
+- 品种：`/api/varieties/page`、`/api/varieties/{id}`、`/api/varieties`、`/api/varieties/export`
 - 文件：`/api/files/upload`
-- 二维码：`/api/qrcode/generate/{id}`、`/api/qrcode/{id}`、`/api/qrcode/export`
+- 二维码：`/api/qrcode/generate/{id}`、`/api/qrcode/{id}`、`/api/qrcode/export`、`/api/qrcode/scan/{id}`、`/api/qrcode/records/page`
 
 ## 小程序登录说明
 

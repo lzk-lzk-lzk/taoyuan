@@ -10,7 +10,9 @@ public class VarietyDetailVO {
     private Long id;
     private String varietyCode;
     private String varietyName;
+    private Long categoryId;
     private String categoryName;
+    private String categoryPath;
     private String coverImage;
     private String distributionArea;
     private String fruitTraits;

@@ -1,13 +1,22 @@
 package com.example.peach.modules.qrcode.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.peach.common.config.QrCodeProperties;
+import com.example.peach.common.context.LoginUser;
 import com.example.peach.common.exception.BusinessException;
+import com.example.peach.common.result.PageResult;
+import com.example.peach.common.utils.SecurityUtils;
 import com.example.peach.common.utils.StringUtils;
 import com.example.peach.modules.file.service.FileStorageService;
 import com.example.peach.modules.qrcode.dto.QrCodeExportDTO;
+import com.example.peach.modules.qrcode.dto.QrCodeScanPageQueryDTO;
+import com.example.peach.modules.qrcode.entity.QrCodeScanRecord;
+import com.example.peach.modules.qrcode.mapper.QrCodeScanRecordMapper;
 import com.example.peach.modules.qrcode.service.QrCodeService;
 import com.example.peach.modules.qrcode.vo.QrCodeInfoVO;
+import com.example.peach.modules.qrcode.vo.QrCodeScanRecordVO;
 import com.example.peach.modules.variety.entity.FruitVariety;
 import com.example.peach.modules.variety.service.FruitVarietyService;
 import com.google.zxing.BarcodeFormat;
@@ -26,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import org.springframework.beans.BeanUtils;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -40,13 +50,16 @@ public class QrCodeServiceImpl implements QrCodeService {
     private final FruitVarietyService fruitVarietyService;
     private final FileStorageService fileStorageService;
     private final QrCodeProperties qrCodeProperties;
+    private final QrCodeScanRecordMapper qrCodeScanRecordMapper;
 
     public QrCodeServiceImpl(FruitVarietyService fruitVarietyService,
                              FileStorageService fileStorageService,
-                             QrCodeProperties qrCodeProperties) {
+                             QrCodeProperties qrCodeProperties,
+                             QrCodeScanRecordMapper qrCodeScanRecordMapper) {
         this.fruitVarietyService = fruitVarietyService;
         this.fileStorageService = fileStorageService;
         this.qrCodeProperties = qrCodeProperties;
+        this.qrCodeScanRecordMapper = qrCodeScanRecordMapper;
     }
 
     @Override
@@ -99,7 +112,37 @@ public class QrCodeServiceImpl implements QrCodeService {
         }
     }
 
-    // 如果二维码不存在则先生成
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    // 记录扫码
+    public void recordScan(Long id, String scanIp) {
+        FruitVariety variety = fruitVarietyService.getEntityOrThrow(id);
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        QrCodeScanRecord record = new QrCodeScanRecord();
+        record.setVarietyId(variety.getId());
+        record.setVarietyName(variety.getVarietyName());
+        record.setScanUserId(loginUser.getUserId());
+        record.setScanUsername(loginUser.getUsername());
+        record.setScanUserType(loginUser.getUserType());
+        record.setScanIp(scanIp);
+        record.setScanTime(LocalDateTime.now());
+        qrCodeScanRecordMapper.insert(record);
+    }
+
+    @Override
+    // 分页查询扫码记录
+    public PageResult<QrCodeScanRecordVO> pageScanRecords(QrCodeScanPageQueryDTO dto) {
+        Page<QrCodeScanRecord> page = qrCodeScanRecordMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()),
+                new LambdaQueryWrapper<QrCodeScanRecord>()
+                        .like(StringUtils.hasText(dto.getVarietyName()), QrCodeScanRecord::getVarietyName, dto.getVarietyName())
+                        .eq(StringUtils.hasText(dto.getScanUserType()), QrCodeScanRecord::getScanUserType, dto.getScanUserType())
+                        .ge(dto.getStartTime() != null, QrCodeScanRecord::getScanTime, dto.getStartTime())
+                        .le(dto.getEndTime() != null, QrCodeScanRecord::getScanTime, dto.getEndTime())
+                        .orderByDesc(QrCodeScanRecord::getScanTime));
+        List<QrCodeScanRecordVO> records = page.getRecords().stream().map(this::toScanVo).toList();
+        return new PageResult<>(records, page.getTotal(), dto.getPageNum(), dto.getPageSize());
+    }
+
     private QrCodeInfoVO getOrGenerateInfo(Long id) {
         FruitVariety variety = fruitVarietyService.getEntityOrThrow(id);
         if (!StringUtils.hasText(variety.getQrCodeUrl()) || !StringUtils.hasText(variety.getQrTargetUrl())) {
@@ -108,7 +151,6 @@ public class QrCodeServiceImpl implements QrCodeService {
         return toInfoVo(variety);
     }
 
-    // 计算二维码实际跳转地址
     private String resolveTargetUrl(FruitVariety variety) {
         if (StringUtils.hasText(variety.getQrTargetUrl())) {
             return variety.getQrTargetUrl();
@@ -116,7 +158,6 @@ public class QrCodeServiceImpl implements QrCodeService {
         return qrCodeProperties.getDefaultTargetPrefix() + variety.getId();
     }
 
-    // 生成二维码图片字节流
     private byte[] createQrCode(String content) {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
@@ -130,13 +171,18 @@ public class QrCodeServiceImpl implements QrCodeService {
         }
     }
 
-    // 转换二维码返回对象
     private QrCodeInfoVO toInfoVo(FruitVariety variety) {
         QrCodeInfoVO vo = new QrCodeInfoVO();
         vo.setVarietyId(variety.getId());
         vo.setVarietyName(variety.getVarietyName());
         vo.setQrCodeUrl(variety.getQrCodeUrl());
         vo.setQrTargetUrl(resolveTargetUrl(variety));
+        return vo;
+    }
+
+    private QrCodeScanRecordVO toScanVo(QrCodeScanRecord record) {
+        QrCodeScanRecordVO vo = new QrCodeScanRecordVO();
+        BeanUtils.copyProperties(record, vo);
         return vo;
     }
 }

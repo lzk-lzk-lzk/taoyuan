@@ -7,6 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
 @MapperScan({
+        "com.example.peach.modules.category.mapper",
+        "com.example.peach.modules.qrcode.mapper",
         "com.example.peach.modules.user.mapper",
         "com.example.peach.modules.variety.mapper"
 })

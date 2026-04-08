@@ -42,7 +42,7 @@ springdoc:
 # MyBatis Plus 配置
 mybatis-plus:
   mapper-locations: classpath:/mapper/*.xml
-  type-aliases-package: com.example.peach.modules.user.entity,com.example.peach.modules.variety.entity
+  type-aliases-package: com.example.peach.modules.user.entity,com.example.peach.modules.variety.entity,com.example.peach.modules.category.entity,com.example.peach.modules.qrcode.entity
   global-config:
     db-config:
       logic-delete-field: delFlag

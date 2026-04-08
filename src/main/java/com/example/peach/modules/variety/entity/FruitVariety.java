@@ -21,7 +21,11 @@ public class FruitVariety {
 
     private String varietyName;
 
+    private Long categoryId;
+
     private String categoryName;
+
+    private String categoryPath;
 
     private String coverImage;
 

@@ -1,11 +1,15 @@
 package com.example.peach.modules.qrcode.controller;
 
+import com.example.peach.common.result.PageResult;
 import com.example.peach.common.result.Result;
 import com.example.peach.modules.qrcode.dto.QrCodeExportDTO;
+import com.example.peach.modules.qrcode.dto.QrCodeScanPageQueryDTO;
 import com.example.peach.modules.qrcode.service.QrCodeService;
 import com.example.peach.modules.qrcode.vo.QrCodeInfoVO;
+import com.example.peach.modules.qrcode.vo.QrCodeScanRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ResponseEntity;
@@ -32,14 +36,12 @@ public class QrCodeController {
     @PostMapping("/generate/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
     @Operation(summary = "生成单个品种二维码")
-    // 生成单个品种二维码
     public Result<QrCodeInfoVO> generate(@PathVariable Long id) {
         return Result.success(qrCodeService.generate(id));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "查询二维码信息")
-    // 查询品种二维码信息
     public Result<QrCodeInfoVO> info(@PathVariable Long id) {
         return Result.success(qrCodeService.getInfo(id));
     }
@@ -47,8 +49,21 @@ public class QrCodeController {
     @PostMapping("/export")
     @PreAuthorize("hasAuthority('ADMIN')")
     @Operation(summary = "批量导出二维码ZIP")
-    // 批量导出二维码 ZIP
     public ResponseEntity<ByteArrayResource> export(@Valid @RequestBody QrCodeExportDTO dto) {
         return qrCodeService.exportZip(dto);
+    }
+
+    @PostMapping("/scan/{id}")
+    @Operation(summary = "记录二维码扫码")
+    public Result<Void> scan(@PathVariable Long id, HttpServletRequest request) {
+        qrCodeService.recordScan(id, request.getRemoteAddr());
+        return Result.success();
+    }
+
+    @GetMapping("/records/page")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @Operation(summary = "分页查询扫码记录")
+    public Result<PageResult<QrCodeScanRecordVO>> recordPage(QrCodeScanPageQueryDTO dto) {
+        return Result.success(qrCodeService.pageScanRecords(dto));
     }
 }

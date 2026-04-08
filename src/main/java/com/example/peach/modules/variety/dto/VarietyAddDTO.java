@@ -1,6 +1,7 @@
 package com.example.peach.modules.variety.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
@@ -13,8 +14,8 @@ public class VarietyAddDTO {
     @NotBlank(message = "品种名称不能为空")
     private String varietyName;
 
-    @NotBlank(message = "类别不能为空")
-    private String categoryName;
+    @NotNull(message = "种属分类不能为空")
+    private Long categoryId;
 
     private String coverImage;
 

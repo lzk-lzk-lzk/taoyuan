@@ -11,6 +11,8 @@ import com.example.peach.modules.variety.vo.VarietyPageVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,14 +39,12 @@ public class VarietyController {
 
     @GetMapping("/page")
     @Operation(summary = "分页查询品种")
-    // 分页查询品种
     public Result<PageResult<VarietyPageVO>> page(VarietyPageQueryDTO dto) {
         return Result.success(fruitVarietyService.pageVarieties(dto));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "查询品种详情")
-    // 查询单个品种详情
     public Result<VarietyDetailVO> detail(@PathVariable Long id) {
         return Result.success(fruitVarietyService.getVarietyDetail(id));
     }
@@ -52,7 +52,6 @@ public class VarietyController {
     @PostMapping
     @PreAuthorize("hasAuthority('ADMIN')")
     @Operation(summary = "新增品种")
-    // 新增品种
     public Result<Void> add(@Valid @RequestBody VarietyAddDTO dto) {
         fruitVarietyService.addVariety(dto);
         return Result.success();
@@ -61,7 +60,6 @@ public class VarietyController {
     @PutMapping
     @PreAuthorize("hasAuthority('ADMIN')")
     @Operation(summary = "修改品种")
-    // 修改品种
     public Result<Void> update(@Valid @RequestBody VarietyUpdateDTO dto) {
         fruitVarietyService.updateVariety(dto);
         return Result.success();
@@ -70,9 +68,15 @@ public class VarietyController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
     @Operation(summary = "删除品种")
-    // 删除品种
     public Result<Void> delete(@PathVariable Long id) {
         fruitVarietyService.deleteVariety(id);
         return Result.success();
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @Operation(summary = "导出品种列表")
+    public ResponseEntity<ByteArrayResource> export(VarietyPageQueryDTO dto) {
+        return fruitVarietyService.exportVarieties(dto);
     }
 }
