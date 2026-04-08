@@ -14,7 +14,4 @@ public class UpdatePasswordDTO {
     @NotBlank(message = "新密码不能为空")
     @Size(min = 6, max = 20, message = "新密码长度需在 6-20 位")
     private String newPassword;
-
-    @NotBlank(message = "确认密码不能为空")
-    private String confirmPassword;
 }

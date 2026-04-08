@@ -108,9 +108,6 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(rollbackFor = Exception.class)
     // 修改当前用户密码
     public void updatePassword(UpdatePasswordDTO dto) {
-        if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
-            throw new BusinessException("两次输入的新密码不一致");
-        }
         SysUser user = sysUserService.getById(SecurityUtils.getUserId());
         if (!passwordEncoder.matches(dto.getOldPassword(), user.getPassword())) {
             throw new BusinessException("旧密码不正确");

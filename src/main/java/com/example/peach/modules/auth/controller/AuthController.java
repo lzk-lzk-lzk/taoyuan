@@ -65,4 +65,12 @@ public class AuthController {
         authService.updatePassword(dto);
         return Result.success();
     }
+
+    @PostMapping("/changePassword")
+    @Operation(summary = "修改密码(别名接口)")
+    // 修改当前登录用户密码
+    public Result<Void> changePassword(@Valid @RequestBody UpdatePasswordDTO dto) {
+        authService.updatePassword(dto);
+        return Result.success();
+    }
 }
