@@ -8,6 +8,8 @@ import com.example.peach.common.result.PageResult;
 import com.example.peach.common.utils.StringUtils;
 import com.example.peach.modules.category.entity.FruitCategory;
 import com.example.peach.modules.category.service.FruitCategoryService;
+import com.example.peach.modules.file.service.FileStorageService;
+import com.example.peach.modules.qrcode.support.QrCodeCardGenerator;
 import com.example.peach.modules.variety.dto.VarietyAddDTO;
 import com.example.peach.modules.variety.dto.VarietyPageQueryDTO;
 import com.example.peach.modules.variety.dto.VarietyUpdateDTO;
@@ -36,9 +38,15 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final FruitCategoryService fruitCategoryService;
+    private final QrCodeCardGenerator qrCodeCardGenerator;
+    private final FileStorageService fileStorageService;
 
-    public FruitVarietyServiceImpl(FruitCategoryService fruitCategoryService) {
+    public FruitVarietyServiceImpl(FruitCategoryService fruitCategoryService,
+                                   QrCodeCardGenerator qrCodeCardGenerator,
+                                   FileStorageService fileStorageService) {
         this.fruitCategoryService = fruitCategoryService;
+        this.qrCodeCardGenerator = qrCodeCardGenerator;
+        this.fileStorageService = fileStorageService;
     }
 
     @Override
@@ -70,7 +78,7 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    // 新增品种并校验编码唯一
+    // 新增品种并自动生成二维码卡片
     public void addVariety(VarietyAddDTO dto) {
         checkVarietyCodeUnique(dto.getVarietyCode(), null);
         FruitVariety variety = new FruitVariety();
@@ -78,17 +86,19 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
         fillCategoryInfo(variety, dto.getCategoryId());
         variety.setDelFlag(0);
         save(variety);
+        refreshQrCodeCard(variety);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    // 修改品种并校验编码唯一
+    // 修改品种并同步刷新二维码卡片
     public void updateVariety(VarietyUpdateDTO dto) {
         checkVarietyCodeUnique(dto.getVarietyCode(), dto.getId());
         FruitVariety variety = getEntityOrThrow(dto.getId());
         BeanUtils.copyProperties(dto, variety);
         fillCategoryInfo(variety, dto.getCategoryId());
         updateById(variety);
+        refreshQrCodeCard(variety);
     }
 
     @Override
@@ -163,6 +173,15 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
         variety.setCategoryId(category.getId());
         variety.setCategoryName(category.getCategoryName());
         variety.setCategoryPath(fruitCategoryService.buildCategoryPath(categoryId));
+    }
+
+    private void refreshQrCodeCard(FruitVariety variety) {
+        QrCodeCardGenerator.GenerateResult result = qrCodeCardGenerator.generate(variety);
+        String fileName = "variety_" + variety.getId() + ".png";
+        String qrCodeUrl = fileStorageService.saveQrCode(result.imageBytes(), fileName);
+        variety.setQrTargetUrl(result.targetUrl());
+        variety.setQrCodeUrl(qrCodeUrl);
+        updateById(variety);
     }
 
     private String csv(Object value) {

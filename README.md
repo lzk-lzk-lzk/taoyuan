@@ -51,5 +51,8 @@
 
 ## 上传目录
 
-- 图片与二维码默认保存在 `D:/project/taoyuan/data`
-- 静态访问前缀是 `/static/**`
+- 支持 `local` 和 `rustfs` 两种存储方式
+- 当前默认配置为 RustFS：`http://localhost:9000`
+- 模板图 `moban.png` 仍从 `D:/project/taoyuan/data` 本地读取
+- 二维码卡片模板默认读取 `D:/project/taoyuan/data/moban.png`
+- 新增品种后会自动生成二维码卡片，修改品种时会同步刷新二维码卡片

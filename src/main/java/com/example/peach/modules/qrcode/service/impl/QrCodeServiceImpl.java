@@ -1,9 +1,7 @@
 package com.example.peach.modules.qrcode.service.impl;
 
-import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.example.peach.common.config.QrCodeProperties;
 import com.example.peach.common.context.LoginUser;
 import com.example.peach.common.exception.BusinessException;
 import com.example.peach.common.result.PageResult;
@@ -15,24 +13,18 @@ import com.example.peach.modules.qrcode.dto.QrCodeScanPageQueryDTO;
 import com.example.peach.modules.qrcode.entity.QrCodeScanRecord;
 import com.example.peach.modules.qrcode.mapper.QrCodeScanRecordMapper;
 import com.example.peach.modules.qrcode.service.QrCodeService;
+import com.example.peach.modules.qrcode.support.QrCodeCardGenerator;
 import com.example.peach.modules.qrcode.vo.QrCodeInfoVO;
 import com.example.peach.modules.qrcode.vo.QrCodeScanRecordVO;
 import com.example.peach.modules.variety.entity.FruitVariety;
 import com.example.peach.modules.variety.service.FruitVarietyService;
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.MultiFormatWriter;
-import com.google.zxing.client.j2se.MatrixToImageWriter;
-import com.google.zxing.common.BitMatrix;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.springframework.beans.BeanUtils;
@@ -49,31 +41,25 @@ public class QrCodeServiceImpl implements QrCodeService {
 
     private final FruitVarietyService fruitVarietyService;
     private final FileStorageService fileStorageService;
-    private final QrCodeProperties qrCodeProperties;
     private final QrCodeScanRecordMapper qrCodeScanRecordMapper;
+    private final QrCodeCardGenerator qrCodeCardGenerator;
 
     public QrCodeServiceImpl(FruitVarietyService fruitVarietyService,
                              FileStorageService fileStorageService,
-                             QrCodeProperties qrCodeProperties,
-                             QrCodeScanRecordMapper qrCodeScanRecordMapper) {
+                             QrCodeScanRecordMapper qrCodeScanRecordMapper,
+                             QrCodeCardGenerator qrCodeCardGenerator) {
         this.fruitVarietyService = fruitVarietyService;
         this.fileStorageService = fileStorageService;
-        this.qrCodeProperties = qrCodeProperties;
         this.qrCodeScanRecordMapper = qrCodeScanRecordMapper;
+        this.qrCodeCardGenerator = qrCodeCardGenerator;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    // 生成并保存单个品种二维码
+    // 生成并保存单个品种二维码卡片
     public QrCodeInfoVO generate(Long id) {
         FruitVariety variety = fruitVarietyService.getEntityOrThrow(id);
-        String targetUrl = resolveTargetUrl(variety);
-        byte[] bytes = createQrCode(targetUrl);
-        String fileName = "variety_" + id + "_" + IdUtil.fastSimpleUUID() + ".png";
-        String qrCodeUrl = fileStorageService.saveQrCode(bytes, fileName);
-        variety.setQrTargetUrl(targetUrl);
-        variety.setQrCodeUrl(qrCodeUrl);
-        fruitVarietyService.updateById(variety);
+        refreshQrCode(variety);
         return toInfoVo(variety);
     }
 
@@ -91,11 +77,10 @@ public class QrCodeServiceImpl implements QrCodeService {
              ZipOutputStream zos = new ZipOutputStream(bos, StandardCharsets.UTF_8)) {
             List<Long> ids = dto.getIds().stream().distinct().toList();
             for (Long id : ids) {
-                QrCodeInfoVO info = getOrGenerateInfo(id);
                 FruitVariety variety = fruitVarietyService.getEntityOrThrow(id);
-                byte[] bytes = createQrCode(info.getQrTargetUrl());
+                QrCodeCardGenerator.GenerateResult result = qrCodeCardGenerator.generate(variety);
                 zos.putNextEntry(new ZipEntry(variety.getVarietyName() + "_" + id + ".png"));
-                zos.write(bytes);
+                zos.write(result.imageBytes());
                 zos.closeEntry();
             }
             zos.finish();
@@ -143,32 +128,13 @@ public class QrCodeServiceImpl implements QrCodeService {
         return new PageResult<>(records, page.getTotal(), dto.getPageNum(), dto.getPageSize());
     }
 
-    private QrCodeInfoVO getOrGenerateInfo(Long id) {
-        FruitVariety variety = fruitVarietyService.getEntityOrThrow(id);
-        if (!StringUtils.hasText(variety.getQrCodeUrl()) || !StringUtils.hasText(variety.getQrTargetUrl())) {
-            return generate(id);
-        }
-        return toInfoVo(variety);
-    }
-
-    private String resolveTargetUrl(FruitVariety variety) {
-        if (StringUtils.hasText(variety.getQrTargetUrl())) {
-            return variety.getQrTargetUrl();
-        }
-        return qrCodeProperties.getDefaultTargetPrefix() + variety.getId();
-    }
-
-    private byte[] createQrCode(String content) {
-        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-            hints.put(EncodeHintType.MARGIN, 1);
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, 320, 320, hints);
-            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", bos);
-            return bos.toByteArray();
-        } catch (Exception e) {
-            throw new BusinessException("生成二维码失败");
-        }
+    private void refreshQrCode(FruitVariety variety) {
+        QrCodeCardGenerator.GenerateResult result = qrCodeCardGenerator.generate(variety);
+        String fileName = "variety_" + variety.getId() + ".png";
+        String qrCodeUrl = fileStorageService.saveQrCode(result.imageBytes(), fileName);
+        variety.setQrTargetUrl(result.targetUrl());
+        variety.setQrCodeUrl(qrCodeUrl);
+        fruitVarietyService.updateById(variety);
     }
 
     private QrCodeInfoVO toInfoVo(FruitVariety variety) {
@@ -176,7 +142,7 @@ public class QrCodeServiceImpl implements QrCodeService {
         vo.setVarietyId(variety.getId());
         vo.setVarietyName(variety.getVarietyName());
         vo.setQrCodeUrl(variety.getQrCodeUrl());
-        vo.setQrTargetUrl(resolveTargetUrl(variety));
+        vo.setQrTargetUrl(variety.getQrTargetUrl());
         return vo;
     }
 

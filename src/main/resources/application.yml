@@ -63,6 +63,7 @@ jwt:
 # 项目自定义配置
 peach:
   file:
+    storage-type: local
     base-path: D:/project/taoyuan/data
     upload-access-path: /static/**
     upload-url-prefix: /static
@@ -72,8 +73,28 @@ peach:
       - jpeg
       - png
       - webp
+    endpoint: http://192.168.3.140:9000
+    region: us-east-1
+    access-key: pdwyadmin
+    secret-key: pdwyadmin
+    bucket: pdwy
   qrcode:
     default-target-prefix: https://example.com/miniapp/variety/detail?id=
+    template-path: D:/project/taoyuan/data/moban.png
+    title-center-x: 626
+    title-y: 112
+    qr-x: 896
+    qr-y: 195
+    qr-size: 264
+    intro-x: 86
+    intro-y: 252
+    intro-max-width: 620
+    intro-line-height: 48
+    intro-max-rows: 3
+    type-value-x: 156
+    type-value-y: 527
+    area-value-x: 206
+    area-value-y: 595
 
 # 微信小程序配置
 wechat:
