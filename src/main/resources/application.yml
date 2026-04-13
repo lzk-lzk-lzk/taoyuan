@@ -99,8 +99,8 @@ peach:
 # 微信小程序配置
 wechat:
   miniapp:
-    app-id: your-miniapp-appid
-    app-secret: your-miniapp-secret
+    app-id: wx41bdbe09984179fa
+    app-secret: b5b0faf89c195f717e6281e5962b5396
     access-token-url: https://api.weixin.qq.com/cgi-bin/token
     code2-session-url: https://api.weixin.qq.com/sns/jscode2session
     phone-number-url: https://api.weixin.qq.com/wxa/business/getuserphonenumber

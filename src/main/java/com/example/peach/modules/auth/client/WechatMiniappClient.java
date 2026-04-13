@@ -1,16 +1,21 @@
 package com.example.peach.modules.auth.client;
 
 import com.example.peach.common.exception.BusinessException;
+import com.example.peach.common.utils.JsonUtils;
 import com.example.peach.modules.auth.config.WechatMiniappProperties;
 import com.example.peach.modules.auth.model.WechatAccessTokenResponse;
 import com.example.peach.modules.auth.model.WechatCode2SessionResponse;
 import com.example.peach.modules.auth.model.WechatPhoneNumberResponse;
 import java.time.Instant;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 @Component
+@Slf4j
 // 微信小程序接口调用客户端
 public class WechatMiniappClient {
 
@@ -28,15 +33,17 @@ public class WechatMiniappClient {
     // 调用 code2Session 获取 openid
     public WechatCode2SessionResponse code2Session(String loginCode) {
         validateConfig();
-        WechatCode2SessionResponse response = restClient.get()
+        String body = restClient.get()
                 .uri(properties.getCode2SessionUrl()
                                 + "?appid={appid}&secret={secret}&js_code={jsCode}&grant_type=authorization_code",
                         properties.getAppId(), properties.getAppSecret(), loginCode)
                 .retrieve()
-                .body(WechatCode2SessionResponse.class);
-        if (response == null) {
+                .body(String.class);
+        log.debug("微信 code2Session 响应: {}", body);
+        if (body == null || body.isBlank()) {
             throw new BusinessException("微信登录失败：code2Session 无返回结果");
         }
+        WechatCode2SessionResponse response = parse(body, WechatCode2SessionResponse.class, "code2Session");
         if (response.getErrcode() != null && response.getErrcode() != 0) {
             throw new BusinessException("微信登录失败：" + response.getErrmsg());
         }
@@ -47,14 +54,26 @@ public class WechatMiniappClient {
     public WechatPhoneNumberResponse.PhoneInfo getPhoneNumber(String phoneCode) {
         validateConfig();
         String accessToken = getAccessToken();
-        WechatPhoneNumberResponse response = restClient.post()
-                .uri(properties.getPhoneNumberUrl() + "?access_token={accessToken}", accessToken)
-                .body(Map.of("code", phoneCode))
-                .retrieve()
-                .body(WechatPhoneNumberResponse.class);
-        if (response == null) {
+        String body;
+        try {
+            body = restClient.post()
+                    .uri(properties.getPhoneNumberUrl() + "?access_token={accessToken}", accessToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("code", phoneCode))
+                    .retrieve()
+                    .body(String.class);
+        } catch (HttpClientErrorException e) {
+            log.error("微信 getPhoneNumber 请求失败，status: {}, body: {}", e.getStatusCode(), e.getResponseBodyAsString(), e);
+            if (e.getStatusCode().value() == 412) {
+                throw new BusinessException("获取微信手机号失败：手机号 code 无效、已被使用、已过期，或与当前小程序 appId 不匹配");
+            }
+            throw new BusinessException("获取微信手机号失败：" + e.getStatusCode().value());
+        }
+        log.debug("微信 getPhoneNumber 响应: {}", body);
+        if (body == null || body.isBlank()) {
             throw new BusinessException("获取微信手机号失败：接口无返回结果");
         }
+        WechatPhoneNumberResponse response = parse(body, WechatPhoneNumberResponse.class, "getPhoneNumber");
         if (response.getErrcode() != null && response.getErrcode() != 0) {
             throw new BusinessException("获取微信手机号失败：" + response.getErrmsg());
         }
@@ -73,15 +92,17 @@ public class WechatMiniappClient {
             if (cachedAccessToken != null && Instant.now().isBefore(accessTokenExpireAt)) {
                 return cachedAccessToken;
             }
-            WechatAccessTokenResponse response = restClient.get()
+            String body = restClient.get()
                     .uri(properties.getAccessTokenUrl()
                                     + "?grant_type=client_credential&appid={appid}&secret={secret}",
                             properties.getAppId(), properties.getAppSecret())
                     .retrieve()
-                    .body(WechatAccessTokenResponse.class);
-            if (response == null) {
+                    .body(String.class);
+            log.debug("微信 access_token 响应: {}", body);
+            if (body == null || body.isBlank()) {
                 throw new BusinessException("获取微信 access_token 失败：接口无返回结果");
             }
+            WechatAccessTokenResponse response = parse(body, WechatAccessTokenResponse.class, "access_token");
             if (response.getErrcode() != null && response.getErrcode() != 0) {
                 throw new BusinessException("获取微信 access_token 失败：" + response.getErrmsg());
             }
@@ -99,6 +120,15 @@ public class WechatMiniappClient {
                 || properties.getAppId().contains("your-miniapp")
                 || properties.getAppSecret().contains("your-miniapp")) {
             throw new BusinessException("请先在 application.yml 中配置微信小程序 appId 和 appSecret");
+        }
+    }
+
+    private <T> T parse(String body, Class<T> clazz, String apiName) {
+        try {
+            return JsonUtils.parseObject(body, clazz);
+        } catch (RuntimeException e) {
+            log.error("微信 {} 响应解析失败，原始内容: {}", apiName, body, e);
+            throw new BusinessException("微信接口响应解析失败：" + apiName);
         }
     }
 }
