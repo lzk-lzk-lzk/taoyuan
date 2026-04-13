@@ -18,6 +18,7 @@ import com.example.peach.modules.auth.vo.UserInfoVO;
 import com.example.peach.modules.user.entity.SysUser;
 import com.example.peach.modules.user.service.SysUserService;
 import java.time.LocalDateTime;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 // 认证业务实现
 public class AuthServiceImpl implements AuthService {
 
@@ -62,6 +64,11 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(rollbackFor = Exception.class)
     // 处理小程序一键登录
     public LoginVO miniappLogin(MiniappLoginDTO dto) {
+        log.info("前端发起小程序登录, loginCode: {}, phoneCode: {}", dto.getLoginCode(), dto.getPhoneCode());
+        log.debug("开始处理小程序一键登录, loginCode长度: {}, phoneCode长度: {}, loginCode摘要: {}, phoneCode摘要: {}",
+                dto.getLoginCode() == null ? 0 : dto.getLoginCode().length(),
+                dto.getPhoneCode() == null ? 0 : dto.getPhoneCode().length(),
+                maskCode(dto.getLoginCode()), maskCode(dto.getPhoneCode()));
         WechatCode2SessionResponse session = wechatMiniappClient.code2Session(dto.getLoginCode());
         WechatPhoneNumberResponse.PhoneInfo phoneInfo = wechatMiniappClient.getPhoneNumber(dto.getPhoneCode());
         SysUser user = sysUserService.lambdaQuery()
@@ -163,5 +170,16 @@ public class AuthServiceImpl implements AuthService {
     // 转换前端使用的身份标识
     private String resolveIdentity(String userType) {
         return UserType.ADMIN.equals(userType) ? "admin" : "user";
+    }
+
+    // 脱敏输出小程序 code，方便排查是否重复或传错值
+    private String maskCode(String code) {
+        if (code == null || code.isBlank()) {
+            return "empty";
+        }
+        if (code.length() <= 8) {
+            return code;
+        }
+        return code.substring(0, 4) + "..." + code.substring(code.length() - 4);
     }
 }

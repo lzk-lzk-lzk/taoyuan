@@ -3,12 +3,14 @@ package com.example.peach.modules.user.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.peach.common.constant.UserType;
 import com.example.peach.common.exception.BusinessException;
 import com.example.peach.common.result.PageResult;
 import com.example.peach.common.utils.SecurityUtils;
 import com.example.peach.common.utils.StringUtils;
 import com.example.peach.modules.user.dto.UserAddDTO;
 import com.example.peach.modules.user.dto.UserPageQueryDTO;
+import com.example.peach.modules.user.dto.UserProfileUpdateDTO;
 import com.example.peach.modules.user.dto.UserResetPasswordDTO;
 import com.example.peach.modules.user.dto.UserStatusDTO;
 import com.example.peach.modules.user.dto.UserUpdateDTO;
@@ -17,6 +19,7 @@ import com.example.peach.modules.user.mapper.SysUserMapper;
 import com.example.peach.modules.user.service.SysUserService;
 import com.example.peach.modules.user.vo.UserDetailVO;
 import com.example.peach.modules.user.vo.UserPageVO;
+import com.example.peach.modules.user.vo.UserProfileVO;
 import java.util.List;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -115,6 +118,27 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         updateById(user);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    // 修改当前登录用户个人信息
+    public void updateCurrentUserProfile(UserProfileUpdateDTO dto) {
+        SysUser user = getUserOrThrow(SecurityUtils.getUserId());
+        user.setNickName(dto.getNickName());
+        user.setAvatar(dto.getAvatar());
+        updateById(user);
+    }
+
+    @Override
+    // 获取当前登录用户个人信息
+    public UserProfileVO getCurrentUserProfile() {
+        SysUser user = getUserOrThrow(SecurityUtils.getUserId());
+        UserProfileVO vo = new UserProfileVO();
+        BeanUtils.copyProperties(user, vo);
+        vo.setIdentity(resolveIdentity(user.getUserType()));
+        vo.setAdmin(UserType.ADMIN.equals(user.getUserType()));
+        return vo;
+    }
+
     // 校验用户名是否重复
     private void checkUsernameUnique(String username, Long excludeId) {
         Long count = lambdaQuery()
@@ -141,5 +165,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         UserPageVO vo = new UserPageVO();
         BeanUtils.copyProperties(user, vo);
         return vo;
+    }
+
+    // 转换前端使用的身份标识
+    private String resolveIdentity(String userType) {
+        return UserType.ADMIN.equals(userType) ? "admin" : "user";
     }
 }
