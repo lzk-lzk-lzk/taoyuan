@@ -71,6 +71,17 @@ public class QrCodeServiceImpl implements QrCodeService {
     }
 
     @Override
+    // 批量获取二维码图片下载信息
+    public List<QrCodeInfoVO> listDownloadInfos(QrCodeExportDTO dto) {
+        return dto.getIds().stream()
+                .distinct()
+                .map(fruitVarietyService::getEntityOrThrow)
+                .map(this::ensureQrCodeReady)
+                .map(this::toInfoVo)
+                .toList();
+    }
+
+    @Override
     // 批量导出二维码压缩包
     public ResponseEntity<ByteArrayResource> exportZip(QrCodeExportDTO dto) {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -84,7 +95,8 @@ public class QrCodeServiceImpl implements QrCodeService {
                 zos.closeEntry();
             }
             zos.finish();
-            String fileName = "qrcode_export_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".zip";
+            String fileName = "qrcode_export_"
+                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".zip";
             String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             ByteArrayResource resource = new ByteArrayResource(bos.toByteArray());
             return ResponseEntity.ok()
@@ -128,6 +140,7 @@ public class QrCodeServiceImpl implements QrCodeService {
         return new PageResult<>(records, page.getTotal(), dto.getPageNum(), dto.getPageSize());
     }
 
+    // 刷新二维码并保存地址
     private void refreshQrCode(FruitVariety variety) {
         QrCodeCardGenerator.GenerateResult result = qrCodeCardGenerator.generate(variety);
         String fileName = "variety_" + variety.getId() + ".png";
@@ -137,6 +150,15 @@ public class QrCodeServiceImpl implements QrCodeService {
         fruitVarietyService.updateById(variety);
     }
 
+    // 确保品种已有可下载的二维码图片
+    private FruitVariety ensureQrCodeReady(FruitVariety variety) {
+        if (!StringUtils.hasText(variety.getQrCodeUrl())) {
+            refreshQrCode(variety);
+        }
+        return variety;
+    }
+
+    // 转换二维码信息返回对象
     private QrCodeInfoVO toInfoVo(FruitVariety variety) {
         QrCodeInfoVO vo = new QrCodeInfoVO();
         vo.setVarietyId(variety.getId());
@@ -146,6 +168,7 @@ public class QrCodeServiceImpl implements QrCodeService {
         return vo;
     }
 
+    // 转换扫码记录返回对象
     private QrCodeScanRecordVO toScanVo(QrCodeScanRecord record) {
         QrCodeScanRecordVO vo = new QrCodeScanRecordVO();
         BeanUtils.copyProperties(record, vo);

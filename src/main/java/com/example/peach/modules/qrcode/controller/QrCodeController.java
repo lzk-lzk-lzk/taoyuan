@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,6 +45,13 @@ public class QrCodeController {
     @Operation(summary = "查询二维码信息")
     public Result<QrCodeInfoVO> info(@PathVariable Long id) {
         return Result.success(qrCodeService.getInfo(id));
+    }
+
+    @PostMapping("/download/list")
+    @Operation(summary = "批量获取二维码图片下载信息")
+    // 小程序批量获取二维码图片地址
+    public Result<List<QrCodeInfoVO>> downloadList(@Valid @RequestBody QrCodeExportDTO dto) {
+        return Result.success(qrCodeService.listDownloadInfos(dto));
     }
 
     @PostMapping("/export")

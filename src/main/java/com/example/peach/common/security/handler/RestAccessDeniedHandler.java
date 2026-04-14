@@ -21,6 +21,6 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
                        HttpServletResponse response,
                        AccessDeniedException accessDeniedException) throws IOException, ServletException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        ServletUtils.writeJson(response, JsonUtils.toJson(Result.fail(403, "无权限访问")));
+        ServletUtils.writeJson(response, JsonUtils.toJson(Result.fail(403, "权限不足")));
     }
 }

@@ -4,6 +4,8 @@ import com.example.peach.common.result.Result;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -28,7 +30,7 @@ public class GlobalExceptionHandler {
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
-                .collect(Collectors.joining("；"));
+                .collect(Collectors.joining("，"));
         log.warn("请求参数校验异常: {}", message, e);
         return Result.fail(400, message);
     }
@@ -38,7 +40,7 @@ public class GlobalExceptionHandler {
     public Result<Void> handleBindException(BindException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
-                .collect(Collectors.joining("；"));
+                .collect(Collectors.joining("，"));
         log.warn("表单参数绑定异常: {}", message, e);
         return Result.fail(400, message);
     }
@@ -55,6 +57,13 @@ public class GlobalExceptionHandler {
     public Result<Void> handleAuthenticationException(AuthenticationException e) {
         log.warn("认证异常: {}", e.getMessage(), e);
         return Result.fail(401, "账号或密码错误");
+    }
+
+    @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
+    // 处理无权限异常
+    public Result<Void> handleAccessDeniedException(Exception e) {
+        log.warn("无权限访问: {}", e.getMessage(), e);
+        return Result.fail(403, "权限不足");
     }
 
     @ExceptionHandler(Exception.class)
