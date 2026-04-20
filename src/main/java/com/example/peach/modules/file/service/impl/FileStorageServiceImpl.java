@@ -84,7 +84,7 @@ public class FileStorageServiceImpl implements FileStorageService {
     }
 
     private String saveToLocal(byte[] bytes, String objectKey) {
-        Path relativePath = Paths.get(objectKey.replace("/", "\\"));
+        Path relativePath = Paths.get("", objectKey.split("/"));
         Path target = resolvePath(relativePath);
         try {
             Files.createDirectories(target.getParent());
@@ -131,7 +131,11 @@ public class FileStorageServiceImpl implements FileStorageService {
     private String buildLocalAccessUrl(Path relativePath) {
         String prefix = fileProperties.getUploadUrlPrefix();
         String relative = relativePath.toString().replace("\\", "/");
-        return prefix + "/" + relative;
+        String url = prefix + "/" + relative;
+        if (StringUtils.hasText(fileProperties.getPublicUrlPrefix())) {
+            return trimTrailingSlash(fileProperties.getPublicUrlPrefix()) + url;
+        }
+        return url;
     }
 
     private String buildRustFsUrl(String objectKey) {
@@ -148,5 +152,13 @@ public class FileStorageServiceImpl implements FileStorageService {
             return null;
         }
         return fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+    }
+
+    // 去掉末尾斜杠，避免拼接出双斜杠
+    private String trimTrailingSlash(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

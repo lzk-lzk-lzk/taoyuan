@@ -11,20 +11,24 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.FontFormatException;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 // 二维码卡片生成器
 public class QrCodeCardGenerator {
 
@@ -38,7 +42,8 @@ public class QrCodeCardGenerator {
     public GenerateResult generate(FruitVariety variety) {
         String targetUrl = resolveTargetUrl(variety);
         try {
-            BufferedImage template = ImageIO.read(new File(qrCodeProperties.getTemplatePath()));
+            File templateFile = new File(qrCodeProperties.getTemplatePath());
+            BufferedImage template = ImageIO.read(templateFile);
             if (template == null) {
                 throw new BusinessException("二维码模板图片读取失败");
             }
@@ -68,7 +73,7 @@ public class QrCodeCardGenerator {
     }
 
     private void drawTitle(Graphics2D g2d, String title) {
-        Font font = new Font("Microsoft YaHei", Font.BOLD, 34);
+        Font font = loadFont(Font.BOLD, 34f);
         g2d.setFont(font);
         g2d.setColor(Color.BLACK);
         FontMetrics metrics = g2d.getFontMetrics(font);
@@ -78,7 +83,7 @@ public class QrCodeCardGenerator {
     }
 
     private void drawIntro(Graphics2D g2d, String intro) {
-        Font textFont = new Font("Microsoft YaHei", Font.PLAIN, 22);
+        Font textFont = loadFont(Font.PLAIN, 22f);
         g2d.setColor(Color.BLACK);
         g2d.setFont(textFont);
         FontMetrics metrics = g2d.getFontMetrics(textFont);
@@ -91,14 +96,14 @@ public class QrCodeCardGenerator {
     }
 
     private void drawTypeValue(Graphics2D g2d, String value) {
-        Font valueFont = new Font("Microsoft YaHei", Font.PLAIN, 24);
+        Font valueFont = loadFont(Font.PLAIN, 24f);
         g2d.setColor(Color.BLACK);
         g2d.setFont(valueFont);
         g2d.drawString(value, qrCodeProperties.getTypeValueX(), qrCodeProperties.getTypeValueY());
     }
 
     private void drawAreaValue(Graphics2D g2d, String value) {
-        Font valueFont = new Font("Microsoft YaHei", Font.PLAIN, 24);
+        Font valueFont = loadFont(Font.PLAIN, 24f);
         g2d.setColor(Color.BLACK);
         g2d.setFont(valueFont);
         g2d.drawString(value, qrCodeProperties.getAreaValueX(), qrCodeProperties.getAreaValueY());
@@ -118,10 +123,14 @@ public class QrCodeCardGenerator {
     }
 
     private String resolveTargetUrl(FruitVariety variety) {
+        // 优先使用配置里的详情页地址前缀并拼接品种ID
+        if (StringUtils.hasText(qrCodeProperties.getDefaultTargetPrefix())) {
+            return qrCodeProperties.getDefaultTargetPrefix() + variety.getId();
+        }
         if (StringUtils.hasText(variety.getQrTargetUrl())) {
             return variety.getQrTargetUrl();
         }
-        return qrCodeProperties.getDefaultTargetPrefix() + variety.getId();
+        return String.valueOf(variety.getId());
     }
 
     private String buildIntro(FruitVariety variety) {
@@ -170,6 +179,23 @@ public class QrCodeCardGenerator {
 
     private String safeText(String value, String defaultValue) {
         return StringUtils.hasText(value) ? value : defaultValue;
+    }
+
+    // 优先读取配置的字体文件，解决 Linux 中文乱码问题
+    private Font loadFont(int style, float size) {
+        if (StringUtils.hasText(qrCodeProperties.getFontPath())) {
+            File fontFile = new File(qrCodeProperties.getFontPath());
+            if (fontFile.exists() && fontFile.canRead()) {
+                try {
+                    return Font.createFont(Font.TRUETYPE_FONT, fontFile).deriveFont(style, size);
+                } catch (FontFormatException | IOException e) {
+                    log.warn("二维码字体文件加载失败，将使用系统字体回退, path: {}", qrCodeProperties.getFontPath(), e);
+                }
+            } else {
+                log.warn("二维码字体文件不存在或不可读, path: {}", qrCodeProperties.getFontPath());
+            }
+        }
+        return new Font(qrCodeProperties.getFontFamily(), style, Math.round(size));
     }
 
     public record GenerateResult(String targetUrl, byte[] imageBytes) {

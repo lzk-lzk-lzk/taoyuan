@@ -12,6 +12,10 @@ public class QrCodeProperties {
 
     private String templatePath;
 
+    private String fontPath;
+
+    private String fontFamily = "SansSerif";
+
     private Integer titleCenterX = 626;
 
     private Integer titleY = 110;

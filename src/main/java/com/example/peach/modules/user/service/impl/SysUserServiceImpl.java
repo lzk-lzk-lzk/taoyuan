@@ -66,6 +66,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     // 新增用户并加密密码
     public void addUser(UserAddDTO dto) {
         checkUsernameUnique(dto.getUsername(), null);
+        checkPhoneUnique(dto.getPhone(), null);
         SysUser user = new SysUser();
         BeanUtils.copyProperties(dto, user);
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
@@ -78,6 +79,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     // 修改用户基础信息
     public void updateUser(UserUpdateDTO dto) {
         SysUser user = getUserOrThrow(dto.getId());
+        checkPhoneUnique(dto.getPhone(), dto.getId());
         user.setNickName(dto.getNickName());
         user.setPhone(dto.getPhone());
         user.setAvatar(dto.getAvatar());
@@ -148,6 +150,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 .count();
         if (count > 0) {
             throw new BusinessException("用户名已存在");
+        }
+    }
+
+    // 校验手机号是否重复
+    private void checkPhoneUnique(String phone, Long excludeId) {
+        if (!StringUtils.hasText(phone)) {
+            return;
+        }
+        Long count = lambdaQuery()
+                .eq(SysUser::getPhone, phone)
+                .eq(SysUser::getDelFlag, 0)
+                .ne(excludeId != null, SysUser::getId, excludeId)
+                .count();
+        if (count > 0) {
+            throw new BusinessException("手机号已存在");
         }
     }
 

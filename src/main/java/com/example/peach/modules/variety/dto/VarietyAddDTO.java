@@ -8,9 +8,6 @@ import lombok.Data;
 // 新增品种参数
 public class VarietyAddDTO {
 
-    @NotBlank(message = "品种编码不能为空")
-    private String varietyCode;
-
     @NotBlank(message = "品种名称不能为空")
     private String varietyName;
 
@@ -19,6 +16,7 @@ public class VarietyAddDTO {
 
     private String coverImage;
 
+    @NotBlank(message = "分布地区不能为空")
     private String distributionArea;
 
     private String fruitTraits;

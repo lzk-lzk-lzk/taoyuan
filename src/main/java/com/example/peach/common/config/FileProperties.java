@@ -13,6 +13,7 @@ public class FileProperties {
     private String basePath;
     private String uploadAccessPath;
     private String uploadUrlPrefix;
+    private String publicUrlPrefix;
     private Long imageMaxSize;
     private List<String> allowedImageTypes;
     private String endpoint;

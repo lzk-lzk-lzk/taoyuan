@@ -11,9 +11,6 @@ public class VarietyUpdateDTO {
     @NotNull(message = "品种ID不能为空")
     private Long id;
 
-    @NotBlank(message = "品种编码不能为空")
-    private String varietyCode;
-
     @NotBlank(message = "品种名称不能为空")
     private String varietyName;
 
@@ -22,6 +19,7 @@ public class VarietyUpdateDTO {
 
     private String coverImage;
 
+    @NotBlank(message = "分布地区不能为空")
     private String distributionArea;
 
     private String fruitTraits;

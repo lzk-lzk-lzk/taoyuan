@@ -78,13 +78,13 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             user = sysUserService.lambdaQuery()
                     .eq(SysUser::getPhone, phoneInfo.getPhoneNumber())
-                    .eq(SysUser::getUserType, UserType.MINIAPP)
                     .eq(SysUser::getDelFlag, 0)
                     .one();
         }
         if (user == null) {
             user = createMiniappUser(session.getOpenid(), phoneInfo.getPhoneNumber());
-        } else if (user.getOpenId() == null || user.getOpenId().isBlank()) {
+        } else if (user.getOpenId() == null || user.getOpenId().isBlank()
+                || !session.getOpenid().equals(user.getOpenId())) {
             user.setOpenId(session.getOpenid());
             sysUserService.updateById(user);
         }

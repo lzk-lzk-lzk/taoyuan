@@ -15,9 +15,15 @@ public class VarietyPageVO {
     private String categoryPath;
     private String coverImage;
     private String distributionArea;
+    private String fruitTraits;
+    private String cultivationPoints;
     private String qrCodeUrl;
+    private String qrTargetUrl;
     private Integer status;
     private Integer sortNum;
     private String remark;
+    private String createBy;
     private LocalDateTime createTime;
+    private String updateBy;
+    private LocalDateTime updateTime;
 }

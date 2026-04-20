@@ -20,8 +20,10 @@ import com.example.peach.modules.variety.vo.VarietyDetailVO;
 import com.example.peach.modules.variety.vo.VarietyPageVO;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.BeanUtils;
 import org.springframework.core.io.ByteArrayResource;
@@ -80,10 +82,11 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
     @Transactional(rollbackFor = Exception.class)
     // 新增品种并自动生成二维码卡片
     public void addVariety(VarietyAddDTO dto) {
-        checkVarietyCodeUnique(dto.getVarietyCode(), null);
         FruitVariety variety = new FruitVariety();
         BeanUtils.copyProperties(dto, variety);
         fillCategoryInfo(variety, dto.getCategoryId());
+        variety.setDistributionArea(normalizeDistributionArea(dto.getDistributionArea()));
+        variety.setVarietyCode(generateVarietyCode(variety.getDistributionArea(), null));
         variety.setDelFlag(0);
         save(variety);
         refreshQrCodeCard(variety);
@@ -93,10 +96,11 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
     @Transactional(rollbackFor = Exception.class)
     // 修改品种并同步刷新二维码卡片
     public void updateVariety(VarietyUpdateDTO dto) {
-        checkVarietyCodeUnique(dto.getVarietyCode(), dto.getId());
         FruitVariety variety = getEntityOrThrow(dto.getId());
         BeanUtils.copyProperties(dto, variety);
         fillCategoryInfo(variety, dto.getCategoryId());
+        variety.setDistributionArea(normalizeDistributionArea(dto.getDistributionArea()));
+        variety.setVarietyCode(generateVarietyCode(variety.getDistributionArea(), dto.getId()));
         updateById(variety);
         refreshQrCodeCard(variety);
     }
@@ -149,18 +153,6 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
                 .orderByDesc(FruitVariety::getCreateTime);
     }
 
-    // 校验品种编码是否重复
-    private void checkVarietyCodeUnique(String varietyCode, Long excludeId) {
-        Long count = lambdaQuery()
-                .eq(FruitVariety::getVarietyCode, varietyCode)
-                .eq(FruitVariety::getDelFlag, 0)
-                .ne(excludeId != null, FruitVariety::getId, excludeId)
-                .count();
-        if (count > 0) {
-            throw new BusinessException("品种编码已存在");
-        }
-    }
-
     // 转换分页返回对象
     private VarietyPageVO toPageVo(FruitVariety variety) {
         VarietyPageVO vo = new VarietyPageVO();
@@ -182,6 +174,45 @@ public class FruitVarietyServiceImpl extends ServiceImpl<FruitVarietyMapper, Fru
         variety.setQrTargetUrl(result.targetUrl());
         variety.setQrCodeUrl(qrCodeUrl);
         updateById(variety);
+    }
+
+    // 按年份-分布地区-三位序号生成品种编码
+    private String generateVarietyCode(String distributionArea, Long excludeId) {
+        String area = normalizeDistributionArea(distributionArea);
+        String prefix = LocalDate.now().getYear() + "-" + area + "-";
+        List<FruitVariety> varieties = lambdaQuery()
+                .likeRight(FruitVariety::getVarietyCode, prefix)
+                .eq(FruitVariety::getDelFlag, 0)
+                .ne(excludeId != null, FruitVariety::getId, excludeId)
+                .list();
+        int nextNumber = varieties.stream()
+                .map(FruitVariety::getVarietyCode)
+                .map(code -> extractCodeNumber(code, prefix))
+                .filter(number -> number > 0)
+                .max(Comparator.naturalOrder())
+                .orElse(0) + 1;
+        return prefix + String.format("%03d", nextNumber);
+    }
+
+    // 规范化分布地区，避免编码里混入首尾空格
+    private String normalizeDistributionArea(String distributionArea) {
+        if (!StringUtils.hasText(distributionArea)) {
+            throw new BusinessException("分布地区不能为空");
+        }
+        return distributionArea.trim();
+    }
+
+    // 解析编码末尾的顺序号
+    private int extractCodeNumber(String varietyCode, String prefix) {
+        if (!StringUtils.hasText(varietyCode) || !varietyCode.startsWith(prefix)) {
+            return 0;
+        }
+        String suffix = varietyCode.substring(prefix.length());
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private String csv(Object value) {

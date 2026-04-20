@@ -67,6 +67,7 @@ peach:
     base-path: D:/project/taoyuan/data
     upload-access-path: /static/**
     upload-url-prefix: /static
+    public-url-prefix: http://localhost:8080
     image-max-size: 5242880
     allowed-image-types:
       - jpg
@@ -79,8 +80,11 @@ peach:
     secret-key: pdwyadmin
     bucket: pdwy
   qrcode:
-    default-target-prefix: https://example.com/miniapp/variety/detail?id=
+    # 二维码跳转地址前缀，系统会自动在后面拼接品种ID
+    default-target-prefix: https://1/pages/variety/detail?id=
     template-path: D:/project/taoyuan/data/moban.png
+    font-path:
+    font-family: Microsoft YaHei
     title-center-x: 626
     title-y: 112
     qr-x: 896
