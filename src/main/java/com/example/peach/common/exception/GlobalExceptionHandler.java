@@ -4,6 +4,7 @@ import com.example.peach.common.result.Result;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -64,6 +65,13 @@ public class GlobalExceptionHandler {
     public Result<Void> handleAccessDeniedException(Exception e) {
         log.warn("无权限访问: {}", e.getMessage(), e);
         return Result.fail(403, "权限不足");
+    }
+
+    @ExceptionHandler(CannotAcquireLockException.class)
+    // 处理数据库锁等待异常
+    public Result<Void> handleCannotAcquireLockException(CannotAcquireLockException e) {
+        log.warn("数据库锁等待超时: {}", e.getMessage(), e);
+        return Result.fail(409, "请求处理中，请稍后重试");
     }
 
     @ExceptionHandler(Exception.class)

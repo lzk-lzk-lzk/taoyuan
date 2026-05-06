@@ -19,9 +19,9 @@ spring:
     name: peach
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/taoyuan?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
+    url: jdbc:mysql://8.134.89.200:3306/taoyuan?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
     username: root
-    password: root
+    password: ganyu@2023
   servlet:
     multipart:
       max-file-size: 5MB

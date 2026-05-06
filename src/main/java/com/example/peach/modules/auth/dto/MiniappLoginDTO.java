@@ -10,6 +10,6 @@ public class MiniappLoginDTO {
     @NotBlank(message = "登录 code 不能为空")
     private String loginCode;
 
-    @NotBlank(message = "手机号 code 不能为空")
+    // 首次绑定手机号时传，已绑定 openId 后可不传
     private String phoneCode;
 }

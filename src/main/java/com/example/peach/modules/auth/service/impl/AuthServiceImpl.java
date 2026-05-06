@@ -1,6 +1,6 @@
 package com.example.peach.modules.auth.service.impl;
 
-import cn.hutool.core.util.IdUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.peach.common.constant.UserType;
 import com.example.peach.common.exception.BusinessException;
 import com.example.peach.common.security.SecurityUser;
@@ -17,7 +17,6 @@ import com.example.peach.modules.auth.vo.LoginVO;
 import com.example.peach.modules.auth.vo.UserInfoVO;
 import com.example.peach.modules.user.entity.SysUser;
 import com.example.peach.modules.user.service.SysUserService;
-import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -51,8 +50,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    // 处理后台账号密码登录
+    // 后台账号密码登录
     public LoginVO login(LoginDTO dto) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dto.getUsername(), dto.getPassword()));
@@ -61,43 +59,45 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    // 处理小程序一键登录
+    // 小程序登录，已有 openId 时跳过手机号验证
     public LoginVO miniappLogin(MiniappLoginDTO dto) {
-        log.info("前端发起小程序登录, loginCode: {}, phoneCode: {}", dto.getLoginCode(), dto.getPhoneCode());
-        log.debug("开始处理小程序一键登录, loginCode长度: {}, phoneCode长度: {}, loginCode摘要: {}, phoneCode摘要: {}",
-                dto.getLoginCode() == null ? 0 : dto.getLoginCode().length(),
-                dto.getPhoneCode() == null ? 0 : dto.getPhoneCode().length(),
-                maskCode(dto.getLoginCode()), maskCode(dto.getPhoneCode()));
+        log.info("小程序登录请求，loginCode: {}, phoneCode摘要: {}", dto.getLoginCode(), maskCode(dto.getPhoneCode()));
+
         WechatCode2SessionResponse session = wechatMiniappClient.code2Session(dto.getLoginCode());
-        WechatPhoneNumberResponse.PhoneInfo phoneInfo = wechatMiniappClient.getPhoneNumber(dto.getPhoneCode());
         SysUser user = sysUserService.lambdaQuery()
                 .eq(SysUser::getOpenId, session.getOpenid())
                 .eq(SysUser::getDelFlag, 0)
                 .one();
-        if (user == null) {
-            user = sysUserService.lambdaQuery()
-                    .eq(SysUser::getPhone, phoneInfo.getPhoneNumber())
-                    .eq(SysUser::getDelFlag, 0)
-                    .one();
+        if (user != null) {
+            checkUserEnabled(user);
+            log.debug("小程序登录命中已有 openId，跳过手机号验证，用户: {}", user.getUsername());
+            return buildLoginResult(user);
         }
+
+        if (!hasText(dto.getPhoneCode())) {
+            throw new BusinessException(400, "首次登录需要手机号授权");
+        }
+
+        WechatPhoneNumberResponse.PhoneInfo phoneInfo = wechatMiniappClient.getPhoneNumber(dto.getPhoneCode());
+        user = sysUserService.lambdaQuery()
+                .eq(SysUser::getPhone, phoneInfo.getPhoneNumber())
+                .eq(SysUser::getDelFlag, 0)
+                .one();
         if (user == null) {
             user = createMiniappUser(session.getOpenid(), phoneInfo.getPhoneNumber());
-        } else if (user.getOpenId() == null || user.getOpenId().isBlank()
-                || !session.getOpenid().equals(user.getOpenId())) {
+        } else {
+            bindOpenId(user.getId(), session.getOpenid());
             user.setOpenId(session.getOpenid());
-            sysUserService.updateById(user);
         }
-        if (!Integer.valueOf(0).equals(user.getStatus())) {
-            throw new BusinessException(403, "账号已停用");
-        }
+
+        checkUserEnabled(user);
         return buildLoginResult(user);
     }
 
     @Override
     // 纯 JWT 登录，退出时前端删除 token 即可
     public void logout() {
-        // 纯 JWT 无状态登录，前端清除 token 即可
+        // 无状态登录不需要服务端处理
     }
 
     @Override
@@ -123,10 +123,8 @@ public class AuthServiceImpl implements AuthService {
         sysUserService.updateById(user);
     }
 
-    // 组装统一登录返回结果
+    // 组装统一登录返回结果，不在登录主链路里更新 last_login_time，避免行锁导致登录超时
     private LoginVO buildLoginResult(SysUser user) {
-        user.setLastLoginTime(LocalDateTime.now());
-        sysUserService.updateById(user);
         SecurityUser securityUser = new SecurityUser(user);
         LoginVO vo = new LoginVO();
         vo.setToken(jwtUtils.generateToken(securityUser));
@@ -141,11 +139,19 @@ public class AuthServiceImpl implements AuthService {
         return vo;
     }
 
+    // 只绑定 openId，避免 updateById 整行更新造成不必要的锁等待
+    private void bindOpenId(Long userId, String openId) {
+        sysUserService.update(Wrappers.<SysUser>lambdaUpdate()
+                .eq(SysUser::getId, userId)
+                .eq(SysUser::getDelFlag, 0)
+                .set(SysUser::getOpenId, openId));
+    }
+
     // 自动创建小程序用户
     private SysUser createMiniappUser(String openId, String phoneNumber) {
         SysUser user = new SysUser();
-        user.setUsername(generateMiniappUsername(phoneNumber));
-        user.setPassword(passwordEncoder.encode(IdUtil.fastSimpleUUID()));
+        user.setUsername(phoneNumber);
+        user.setPassword(passwordEncoder.encode("123456"));
         user.setNickName("微信用户" + phoneNumber.substring(Math.max(phoneNumber.length() - 4, 0)));
         user.setPhone(phoneNumber);
         user.setOpenId(openId);
@@ -157,14 +163,11 @@ public class AuthServiceImpl implements AuthService {
         return user;
     }
 
-    // 生成不重复的小程序用户名
-    private String generateMiniappUsername(String phoneNumber) {
-        String suffix = phoneNumber.substring(Math.max(phoneNumber.length() - 4, 0));
-        String username = "wx_" + suffix;
-        if (sysUserService.lambdaQuery().eq(SysUser::getUsername, username).eq(SysUser::getDelFlag, 0).count() == 0) {
-            return username;
+    // 检查账号是否可用
+    private void checkUserEnabled(SysUser user) {
+        if (!Integer.valueOf(0).equals(user.getStatus())) {
+            throw new BusinessException(403, "账号已停用");
         }
-        return "wx_" + suffix + "_" + IdUtil.fastSimpleUUID().substring(0, 6);
     }
 
     // 转换前端使用的身份标识
@@ -181,5 +184,9 @@ public class AuthServiceImpl implements AuthService {
             return code;
         }
         return code.substring(0, 4) + "..." + code.substring(code.length() - 4);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
